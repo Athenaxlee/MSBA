@@ -1,0 +1,54 @@
+[training@localhost ~]$ cd $ADIR/exercises/analyze_ads
+[training@localhost analyze_ads]$ hadoop fs -cat /dualcore/ad_data1/part* \
+> | head -n 100 > test_ad_data.txt
+cat: Unable to write to output stream.
+[training@localhost analyze_ads]$ ll
+total 28
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_01
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_02
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_03
+-rw-r--r--. 1 training training  677 Dec 10  2013 low_cost_sites.pig
+drwxr-xr-x. 2 training training 4096 Jun  7  2014 sample_solution
+-rw-rw-r--  1 training training 6397 Nov 13 04:59 test_ad_data.txt
+[training@localhost analyze_ads]$ sudo gedit ../analyze_ads/low_cost_sites.pig
+[training@localhost analyze_ads]$ sudo gedit ../analyze_ads/low_cost_sites.pig
+[training@localhost analyze_ads]$ pig –x local low_cost_sites.pig
+2017-11-13 05:07:34,651 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:07:34,651 INFO org.apache.pig.Main: Logging error messages to: /home/training/training_materials/analyst/exercises/analyze_ads/pig_1510567654647.log
+2017-11-13 05:07:35,282 ERROR org.apache.pig.Main: ERROR 2997: Encountered IOException. File –x does not exist
+Details at logfile: /home/training/training_materials/analyst/exercises/analyze_ads/pig_1510567654647.log
+[training@localhost analyze_ads]$ pig -x local low_cost_sites.pig
+2017-11-13 05:08:46,886 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:08:46,886 INFO org.apache.pig.Main: Logging error messages to: /home/training/training_materials/analyst/exercises/analyze_ads/pig_1510567726882.log
+[training@localhost analyze_ads]$ sudo gedit ../analyze_ads/low_cost_sites.pig
+[training@localhost analyze_ads]$ pig low_cost_sites.pig
+2017-11-13 05:10:13,196 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:10:13,197 INFO org.apache.pig.Main: Logging error messages to: /home/training/training_materials/analyst/exercises/analyze_ads/pig_1510567813193.log
+[training@localhost analyze_ads]$ cp low_cost_sites.pig high_cost_keywords.pig
+[training@localhost analyze_ads]$ ll
+total 40
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_01
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_02
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_03
+-rw-r--r--  1 training training  734 Nov 13 05:10 high_cost_keywords.pig
+-rw-r--r--. 1 training training  734 Nov 13 05:09 low_cost_sites.pig
+-rw-r--r--. 1 training training  729 Nov 13 05:07 low_cost_sites.pig~
+-rw-rw-r--  1 training training 1019 Nov 13 05:07 pig_1510567654647.log
+drwxr-xr-x. 2 training training 4096 Jun  7  2014 sample_solution
+-rw-rw-r--  1 training training 6397 Nov 13 04:59 test_ad_data.txt
+[training@localhost analyze_ads]$ sudo gedit ../analyze_ads/high_cost_keywords.pig
+[training@localhost analyze_ads]$ pig high_cost_keywords.pig
+2017-11-13 05:14:14,750 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:14:14,751 INFO org.apache.pig.Main: Logging error messages to: /home/training/training_materials/analyst/exercises/analyze_ads/pig_1510568054749.log
+(PRESENT,165606)
+(TABLET,106509)
+(DUALCORE,95124)
+(BARGAIN,67913)
+(MOBILE,56348)
+[training@localhost analyze_ads]$ cd bonus_01
+[training@localhost bonus_01]$ ll
+total 8
+drwxr-xr-x. 2 training training 4096 Jun  7  2014 sample_solution
+-rw-r--r--. 1 training training  501 Dec 10  2013 total_click_count.pig
+[training@localhost bonus_01]$ sudo gedit ../total_click_count.pig
+[training@localhost bonus_01]$ 

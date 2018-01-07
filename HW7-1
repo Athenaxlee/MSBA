@@ -1,0 +1,66 @@
+[training@localhost ~]$ cd /home/training/petexchange
+[training@localhost petexchange]$ hadoop fs -ls petexchange/posts
+ls: `petexchange/posts': No such file or directory
+[training@localhost petexchange]$ hadoop fs -ls /petexchange/posts
+Found 6 items
+-rw-r--r--   1 training supergroup          0 2017-10-31 08:08 /petexchange/posts/_SUCCESS
+drwxr-xr-x   - training supergroup          0 2017-10-31 08:08 /petexchange/posts/_logs
+-rw-r--r--   1 training supergroup     507896 2017-10-31 08:08 /petexchange/posts/part-m-00000
+-rw-r--r--   1 training supergroup     374768 2017-10-31 08:08 /petexchange/posts/part-m-00001
+-rw-r--r--   1 training supergroup     435043 2017-10-31 08:08 /petexchange/posts/part-m-00002
+-rw-r--r--   1 training supergroup     470226 2017-10-31 08:08 /petexchange/posts/part-m-00003
+[training@localhost petexchange]$ hadoop fs -cat /petexchange/posts/part* \ > | head -n 25 > posts.txt
+bash: syntax error near unexpected token `|'
+[training@localhost petexchange]$ hadoop fs -cat /petexchange/posts/part* | head -n 25 > posts.txt
+cat: Unable to write to output stream.
+cat: Unable to write to output stream.
+cat: Unable to write to output stream.
+cat: Unable to write to output stream.
+[training@localhost petexchange]$ ll
+total 24
+-rw-rw-r-- 1 training training 4511 Oct 31 09:56 posts
+-rw-rw-r-- 1 training training 4511 Nov 13 05:38 posts.txt
+-rw-r--r-- 1 root     root      725 Nov  8 18:55 summarize_posts.pig
+-rw-r--r-- 1 root     root      725 Nov  8 18:55 summarize_posts.pig~
+[training@localhost petexchange]$ sudo gedit ../petexchange/summarize_posts.pig
+[training@localhost petexchange]$ pig -x local summarize_posts.pig
+2017-11-13 05:46:47,101 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:46:47,101 INFO org.apache.pig.Main: Logging error messages to: /home/training/petexchange/pig_1510570007097.log
+2017-11-13 05:46:48,300 ERROR org.apache.pig.tools.grunt.Grunt: ERROR 1200: Pig script failed to parse: 
+<file summarize_posts.pig, line 9, column 49> Invalid scalar projection: grouposts
+Details at logfile: /home/training/petexchange/pig_1510570007097.log
+[training@localhost petexchange]$ sudo gedit ../petexchange/summarize_posts.pig
+[training@localhost petexchange]$ ll
+total 28
+-rw-rw-r-- 1 training training 3299 Nov 13 05:46 pig_1510570007097.log
+-rw-rw-r-- 1 training training 4511 Oct 31 09:56 posts
+-rw-rw-r-- 1 training training 4511 Nov 13 05:38 posts.txt
+-rw-r--r-- 1 root     root      754 Nov 13 05:48 summarize_posts.pig
+-rw-r--r-- 1 root     root      752 Nov 13 05:46 summarize_posts.pig~
+[training@localhost petexchange]$ pig -x local summarize_posts.pig
+2017-11-13 05:50:20,018 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:50:20,018 INFO org.apache.pig.Main: Logging error messages to: /home/training/petexchange/pig_1510570220017.log
+2017-11-13 05:50:21,363 ERROR org.apache.pig.tools.grunt.Grunt: ERROR 1108: 
+<file summarize_posts.pig, line 9, column 27> Duplicate schema alias: sum
+Details at logfile: /home/training/petexchange/pig_1510570220017.log
+[training@localhost petexchange]$ sudo gedit ../petexchange/summarize_posts.pig
+[training@localhost petexchange]$ pig -x local summarize_posts.pig
+2017-11-13 05:51:00,587 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 05:51:00,587 INFO org.apache.pig.Main: Logging error messages to: /home/training/petexchange/pig_1510570260585.log
+(1,1,5971)
+(2,1,1677)
+(3,1,5516)
+(4,1,173)
+(7,1,648)
+(9,1,1769)
+(10,1,546)
+(11,1,8216)
+(12,1,302)
+(14,1,1934)
+(16,1,1269)
+(17,1,268)
+(18,1,11550)
+(20,1,1471)
+(22,1,298)
+(23,1,29742)
+[training@localhost petexchange]$ 

@@ -1,0 +1,91 @@
+[training@localhost ~]$ cd $ADIR/exercises/disparate_datasets
+[training@localhost disparate_datasets]$ pwd
+/home/training/training_materials/analyst/exercises/disparate_datasets
+[training@localhost disparate_datasets]$ ll
+total 32
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_01
+drwxr-xr-x. 3 training training 4096 Dec 10  2013 bonus_02
+-rwxr-xr-x. 1 training training 1155 Nov 13 02:30 count_orders_by_period.pig
+-rw-r--r--. 1 training training 1156 Nov 13 02:17 count_orders_by_period.pig~
+-rwxr-xr-x. 1 training training  649 Dec 10  2013 count_tablet_orders_by_period.pig
+-rw-rw-r--  1 training training 3363 Nov 13 02:36 pig_1510558597941.log
+-rw-rw-r--  1 training training 3363 Nov 13 02:56 pig_1510559810584.log
+drwxr-xr-x. 2 training training 4096 Jun  7  2014 sample_solution
+[training@localhost disparate_datasets]$ sudo gedit ../disparate_datasets/count_orders_by_period.pig
+[training@localhost disparate_datasets]$ cat ../disparate_datasets/count_orders_by_period.pig
+data = LOAD '/dualcore/orders' AS (order_id:int,
+             cust_id:int,
+             order_dtm:chararray);
+
+/*
+ * Include only records where the 'order_dtm' field matches
+ * the regular expression pattern:
+ *
+ *   ^       = beginning of string
+ *   2013    = literal value '2013'
+ *   0[2345] = 0 followed by 2, 3, 4, or 5
+ *   -       = a literal character '-'
+ *   \\d{2}  = exactly two digits
+ *   \\s     = a single whitespace character
+ *   .*      = any number of any characters
+ *   $       = end of string
+ *
+ * If you are not familiar with regular expressions and would 
+ * like to know more about them, see the Regular Expression 
+ * Reference at the end of the Exercise Manual.
+ */
+recent = FILTER data by order_dtm matches '^2013-0[2345]-\\d{2}\\s.*$';
+
+-- A: Creates a new relation with just the order's year and month
+months = FOREACH recent GENERATE SUBSTRING(order_dtm, 0, 7) AS month;
+
+-- B: Counts the number of orders in each month
+grouped = GROUP months BY month;
+counted = FOREACH grouped GENERATE group, COUNT(months.month) AS count;
+
+-- C: Displays the count by month to the screen.
+sorted = ORDER counted BY group;
+DUMP sorted;
+[training@localhost disparate_datasets]$ pig count_orders_by_period.pig2017-11-13 03:16:03,712 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 03:16:03,713 INFO org.apache.pig.Main: Logging error messages to: /home/training/training_materials/analyst/exercises/disparate_datasets/pig_1510560963710.log
+(2013-02,76170)
+(2013-03,84549)
+(2013-04,87853)
+(2013-05,115038)
+[training@localhost disparate_datasets]$ sudo gedit ../disparate_datasets/count_tablet_orders_by_period.pig
+[training@localhost disparate_datasets]$ cat ../disparate_datasets/count_tablet_orders_by_period.pig
+orders = LOAD '/dualcore/orders' AS (order_id:int,
+             cust_id:int,
+             order_dtm:chararray);
+
+details = LOAD '/dualcore/order_details' AS (order_id:int,
+             prod_id:int);
+
+-- include only the months we want to analyze
+recent = FILTER orders BY order_dtm matches '^2013-0[2345]-.*$';
+
+-- include only the product we're advertising
+tablets = FILTER details BY prod_id == 1274348;
+
+
+-- A: Joins the two relations on the order_id field
+joined = JOIN recent BY order_id, tablets BY order_id;
+
+-- B: Creates a new relation containing the month
+months = FOREACH joined GENERATE 
+         SUBSTRING(recent::order_dtm, 0, 7) AS month;
+
+-- C: Groups by month and then count the records in each group
+grouped = GROUP months BY month;
+counted = FOREACH grouped GENERATE group, COUNT(months.month) AS count;
+
+-- D: Displays the results to the screen
+sorted = ORDER counted BY group;
+DUMP sorted;
+[training@localhost disparate_datasets]$ pig count_tablet_orders_by_period.pig2017-11-13 03:21:05,255 INFO org.apache.pig.Main: Apache Pig version 0.10.0-cdh4.2.1 (rexported) compiled Apr 22 2013, 12:04:54
+2017-11-13 03:21:05,256 INFO org.apache.pig.Main: Logging error messages to: /home/training/training_materials/analyst/exercises/disparate_datasets/pig_1510561265252.log
+(2013-02,3598)
+(2013-03,3904)
+(2013-04,4134)
+(2013-05,49514)
+[training@localhost disparate_datasets]$ 
