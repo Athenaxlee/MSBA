@@ -1,0 +1,235 @@
+---
+title: "Exercise 3"
+output: html_notebook
+---
+
+```{r}
+#import all necessary libs
+rm(list = ls(all = TRUE))
+library(igraph)
+library(data.table)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(network)
+library(mclust)
+
+setwd("~/Desktop/Exercise 3/")
+
+# load data:
+VC1 <- read.csv("Funding_events_7.14.csv")
+VC2 <- read.csv("Funding_events_7.14_page2.csv")
+
+# check objects
+ls()
+
+# check data structure
+VC1[1:20,]
+dim(VC1)
+VC2[1:20,]
+dim(VC2)
+
+#combine the datasets
+VC_full <- rbind(VC1, VC2)
+VC_full$Deal.Date <- as.Date(VC_full$Deal.Date, "%m/%d/%y")
+
+#take a subset of the whole df; cleanup rows with zero-length string; sperate investors; prep date
+ivtr_full <- VC_full[, c(4,11)]
+ivtr_full <- subset(ivtr_full, ivtr_full$Investors != "")
+ivtr_full$ivtr_spilt <- strsplit(as.character(ivtr_full$Investors),', ',fixed=TRUE)
+ivtr_full$Deal.Date <- as.Date(ivtr_full$Deal.Date, "%m/%d/%y")
+
+yearspan <- year(max(ivtr_full$Deal.Date)) - year(min(ivtr_full$Deal.Date))
+minyear <- year(min(ivtr_full$Deal.Date))
+
+#assume the first month of the first year is month 1, permutate the month number to each dealdate
+month_num <- list()
+for(i in 1:nrow(ivtr_full))
+{
+  month <- month(ivtr_full$Deal.Date[i])
+  year <- year(ivtr_full$Deal.Date[i])
+  month_num[[i]] <- (year-minyear)*12 + month
+}
+#put the list of month numbers into the dataframe, order the dataframe by the month number
+ivtr_full$month_num <- do.call("rbind",month_num)
+ivtr_full <- ivtr_full[order(ivtr_full$month_num),]
+```
+
+1.There are two files, “Funding_events_7.14.csv”, and “Funding_events_7.14_page2.csv”, containing information on venture capital investment events, from June 1981 until July 2014. Perform the smallworld exercise for the venture capital co-investment network, and determine which firm is the center of the network as of July 2014. Compute the average shortest path length between all firms in July 2014. Why is this number so high?
+
+```{r}
+#calculate how many co-investors are involved in an event
+num_coivst <- list()
+for (i in seq(1, nrow(ivtr_full),1))
+{
+  num_coivst[[i]] <- length(ivtr_full$ivtr_spilt[[i]])
+  
+}
+
+ivtr_full$num_coivst <- do.call("rbind",num_coivst)
+
+#ignore events with only 1 investor (isolate node on a graph)
+ivtr_noiso <- subset(ivtr_full, ivtr_full$num_coivst != 1)
+ivtr_noiso <- ivtr_noiso[order(ivtr_noiso$month_num),]
+
+#map all possible combinations of 2 investor-relationship in an event into a matrix, after transpose the matrix, we get an edge list
+mat_ivtr <-  t(combn(ivtr_noiso$ivtr_spilt[[1]],2))
+
+for(i in seq(2, nrow(ivtr_noiso),1)){
+  mat_ivtr <- rbind(mat_ivtr, t(combn(ivtr_noiso$ivtr_spilt[[i]],2)))
+}
+```
+
+```{r}
+#create the graph based on the edgelist
+network_ivtr <- graph_from_edgelist(mat_ivtr[,c(1,2)], directed = FALSE)
+
+
+#ivtr_graph <- plot.igraph(network_ivtr, vertex.label = NA, edge.size = 1, layout=layout.fruchterman.reingold, vertex.size = 3)
+#ivtr_graph
+#which one has the highest degree (most central) in the network
+max_degree <- which.max(degree(network_ivtr))
+max_degree
+#average shortest path
+mean_distance(network_ivtr, directed = FALSE, unconnected = TRUE)
+
+
+```
+
+2.Reproduce the figure from class that plotted the coreness of the venture capital network over time, using monthly snapshots to update the network. On the x-axis should be the age of the network in months. On the y-axis should be the highest-degree k-core each venture capital firm belongs to, averaged over all firms for that monthly snapshot.
+
+
+
+```{r, message=TRUE, warning=TRUE}
+maxmonth <- max(ivtr_noiso$month_num)
+edgemat <- t(combn(ivtr_noiso$ivtr_spilt[[1]],2))
+
+for (i in 2:nrow(ivtr_noiso))
+{
+  edgemat <- rbind(edgemat, t(combn(ivtr_noiso$ivtr_spilt[[i]],2)))
+}
+
+#create edgelist...
+```
+
+```{r}
+#create a function that do summing from 1 to (x-1)
+trisum <- function(x)
+{
+  (x-1)*1 + ((x-1)*(x-2))/2
+}
+
+#from a collection of investor to an edgelist, each month number is going to repete trisum(# of coinvestors) times in rows.
+monthlist <- array(rep(ivtr_noiso$month_num[1],trisum(ivtr_noiso$num_coivst[[1]])))
+for (i in 2:nrow(ivtr_noiso))
+{
+  monthlist <- append(monthlist, rep(ivtr_noiso$month_num[i],trisum(ivtr_noiso$num_coivst[[i]])))
+}
+network <- cbind(edgemat, monthlist)
+
+network <- network[order(as.numeric(network[,3])), ]
+```
+
+```{r}
+#summarize the number of occurance of each month
+monthtable <- table(network[,3])
+mon <- as.numeric(unique(network[,3]))
+monthmat <- as.matrix(monthtable)
+uniquemonth <- as.numeric(unique(ivtr_full$month_num))
+#totalmon <- as.numeric(unique(ivtr_full$month_num))
+```
+
+```{r}
+#network as of month a will will include all of the edge list rows until the end of month a
+n=0
+plotlist <- list()
+for(j in 1: length(monthtable))
+{
+    n <- n + monthtable[j] # counting how many rows before
+    g <- graph_from_edgelist(network[c(1:n),-3], directed = FALSE)
+    c <- mean(unlist(coreness(g)))
+    
+    plotlist <- append(plotlist, c) # after getting the mean corness for each month, place it into the holder
+    
+}
+plot(mon, plotlist, type = "l")
+```
+
+
+3.Recreate the figure from Question 2, but now allow ties to “decay.” Remove ties from the network if they are not renewed within 10 years. Does the figure appear much different than before? What does this suggest about the nature of relationships in the network?
+```{r}
+
+n=0
+core10 <- list()
+
+
+for(i in mon)
+{
+    monnetwork <- subset(network, network[,3] %in% c((i-119):i)) #so for each month, looking for last 10 years' edgelist
+    g <- graph_from_edgelist(monnetwork[,-3], directed = FALSE) 
+    core <- mean(unlist(coreness(g)))
+    core10 <- append(core10, core)
+}
+
+plot(mon, core10, type = "l")
+
+#The figure did not change much... this implys that people do tend to maintain their relationship in a social network, and this is a small world...
+```
+
+
+4.Let’s also take a look at a clustering approach. For the June 1991 network, use the iterative correlation clustering method, which takes the correlation of the original adjacency matrix and keeps taking the correlation of this result until it converges to a matrix of 1s and −1s. Use this method to split the network into clusters of cliques, and plot the result. Perform this calculation directly on the matrix.
+```{r}
+concor = list()
+#partition the data and only take out the data before 06/1991
+month61991 = (1991- 1981)*12 + 6
+june1991 <- subset(network, network[,3] %in% c(6:month61991))
+june1991 <- june1991[,-3]
+
+graph1991 <- graph_from_edgelist(june1991, directed = FALSE)
+#from a graph to a matrix
+adjmat <- as.matrix(graph1991[])
+
+concor[[1]] = adjmat
+#iterate 9 times...until everything becomes 1 and -1
+for(i in 2:10){
+	concor[[i]] = cor(concor[[i - 1]])
+}
+
+
+concor_ul = do.call(rbind, concor)
+
+concor_ul = round(concor_ul, 3)
+
+write.csv(concor_ul, "concor.csv")
+
+concor[[10]][concor[[10]] < 0] = 0
+
+concor_net = graph.adjacency(as.matrix.network(network(concor[[10]])), "undirected")
+V(concor_net)$color = "light blue"
+plot.igraph(concor_net, layout=layout.fruchterman.reingold, edge.arrow.size=.5, vertex.label.color="black", vertex.label = NA)
+```
+
+5.Do you think the venture capital tends to exhibit more of a core-periphery or clustered/component structure? Describe a couple pieces of evidence for whichever opinion you choose.
+```{r}
+biggraph <- graph_from_edgelist(network[,-3],directed = FALSE)
+components(biggraph)$csize
+# the larget connected network has 11774 nodes, but there are many other little relationships scatter around. So this is a sign of
+```
+
+Extra challenge problem: Another method for clustering networks relies on the betweenness scores of the network edges. The method calculates the betweeness centrality score for all edges, and then removes the edge with the highest score. It then recalculates the betweenness for the remaining edges, and again removes the one with the highest score. For the June 2001 graph, would this method produce the same number of clusters as the correlation method?
+
+```{r}
+network62001 <- (2001- 1981)*12 + 6
+june2001 <- subset(network, network[,3] %in% c(6:network62001))
+
+b <- list()
+
+for (i in 1:nrow(june2001))
+{
+  g <- graph_from_edgelist(june2001[,-3], directed = FALSE) 
+  m <- which.max(betweenness(g))
+  june2001 <- june2001[-m,]
+}
+
+```
+

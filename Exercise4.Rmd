@@ -1,0 +1,222 @@
+---
+title: "Exercise 4 - SNA"
+output: html_notebook
+---
+```{r}
+rm(list = ls(all = TRUE))
+setwd("~/desktop/Exercise 4")
+library(readr)
+library(data.table)
+library(dplyr)
+library(gdata)
+library(proxy)
+library(igraph)
+keyword <- fread("production_keyword_matrix_1985.csv", header = TRUE)
+distance <- fread("film_distance_3year_window.csv", header = TRUE)
+revenue <- fread("box_office_films.csv", header = TRUE)
+filmproducer <- fread("keywords_films_producers.csv",header = TRUE)
+
+```
+
+1.Use the keywords shared between two producers to determine how many producers are maximally similar according to cosine similarity. Is this number the same for Jaccard similarity? Perform this calculation directly on the matrices—the original “keyindex_producers.csv” file has been manipuated into another file, “production_keyword_matrix_1985.csv”, that con- tains an incidence matrix of films that were produced in 1985 and the keywords they contain. The unmatrix() function in the gdata package may be helpful for examining the distance result. If you like, you can try to perform the manipulation of the original data on your own.
+
+```{r}
+#convert the df to matrix and get rid of the first column that has character vectors
+keyword <- as.matrix(keyword[,-1])
+#number of columns of keyword
+colnum <- ncol(keyword)
+# create a matrix that holds the cosine similarity between each two actors
+cosmat <- matrix(data = NA, ncol = colnum, nrow = colnum)
+
+for (i in c(1:(colnum-1)))
+{
+  for(j in c((i+1):colnum))
+      {
+        cosmat[i,j] <- simil(list(keyword[,i],keyword[,j]), method = "cosine") 
+      }
+}
+
+#in the matrix, count the number of vectors in the cosmat matrix,where the cosine similarity equals to 1 (max. similarity)
+maxsimcos <- length(which(cosmat == 1))
+maxsimcos
+# there are 120 pairs
+```
+
+```{r}
+#transform the original matrix to a membership matrix
+memkeyword <- t(keyword) %*% keyword
+
+jacmat <- matrix(data = NA, ncol = colnum, nrow = colnum)
+
+for(i in 1:colnum)
+{
+  for (j in 1:colnum)
+  {#since the diagnals of a membership matrix represent the total event that a actor attend, and the off- diagnals represents number of co- attending (intersection) events. the jaccard will be equal to (# of attend by A & B)/ (# attend by A + # attend by B - # attend by A&B )
+    jacmat [i,j] <- (memkeyword[i,j])/(memkeyword[i,i] + memkeyword[j,j] - memkeyword[i,j])
+  }
+}
+
+maxsimjac <- (length(which(jacmat == 1)) - colnum)/2
+maxsimjac 
+#there are also 120 pairs. Same as the count of cosine
+
+
+```
+
+2.It’s possible to use the “keyindex_producers.csv” file and these box office results to figure out if the films that are close or distant from one another in terms of their shared keywords tend to also bring home similar or different box office revenues. Make the distance comparison among firms produced in the focal year, and the two years prior to that year—the original “keyindex_producers.csv” has been manipulated into another file, “film_distance_3year_window.csv”, that contains pairwise Jaccard distances between films for this time comparison. Produce a plot showing this relationship.
+```{r}
+
+rev <- revenue[,c(4,1)]
+duplicates <- which(duplicated(rev$pindex) == TRUE) # There are duplicate rows in the boxoffice file
+#eliminate all duplicate rows
+
+revunique <- unique(rev)
+dupli <- which(duplicated(revunique$pindex) == TRUE)
+duplirm <- revunique[-dupli,]
+disrev <- merge(distance, duplirm, by.x = "pindex1", by.y = "pindex", all.x = TRUE, incomparables = NA)
+disrevenue <- merge(disrev, duplirm, by.x = "pindex2", by.y = "pindex", all.x = TRUE)
+disrevenue <- na.omit(disrevenue)
+
+disrevenue$similarity <- abs(disrevenue$total_box.x - disrevenue$total_box.y)/((disrevenue$total_box.x + disrevenue$total_box.y)/2)
+
+plot(disrevenue$distance, disrevenue$similarity)
+cor(disrevenue$distance, disrevenue$similarity)
+
+#The correlation betwwen the distance and box office revenue similarity are minimal between 2 films.
+
+
+```
+
+3.We can define a large producer as one that is at the 75th percentile or above for box office revenues that year. Of the top 250 keywords, in terms of box office revenue earned, that were used over the last 10 years, how many of these appeared primarily (i.e., modally) in films made by large companies? By small companies? By collaborations between the two? Illustrate this on a network plot that links together keywords that appear in the same film. On the nodes, provide a visual indication for which keywords appear more often, and, on the edges, for which keywords appear more often with one another. What does this plot suggest about coproduction relationships between production companies? The “data table testing and usage.R” file may be helpful for setting up the attributes of the network.
+```{r}
+fkp <- filmproducer[,c(1,3,4,6)]
+#merge (left join) the file with films & producer &keyword with the clean revenue dataset.
+fkpr <- na.omit(merge(fkp, duplirm, by.x = "pindex", by.y = "pindex", all.x = TRUE))
+#trace 10 year back
+minyr10 <- max(fkpr$year)-9
+#get the new dataframe that shows the last 10 year films with its keywords, year, and producer
+fkpr10 <- subset(fkpr, fkpr$year >= minyr10)
+
+#get the top 250 key word
+key250 <- aggregate(fkpr10$total_box ~ fkpr10$keyindex, fkpr10, sum)
+key250 <- key250[order(-key250$`fkpr10$total_box`),]
+key250 <- key250[c(1:250),]
+
+```
+
+```{r}
+#get the top 25% producers for each year
+
+pr25 <- list()
+for(i in c(2007:2016))
+{
+  a <- subset(fkpr10, fkpr10$year == i)
+  b <- aggregate(a[[5]] ~ a[[4]], a, sum)
+  r <- b[which(b[[2]] >= quantile(b[[2]], 0.75)),]
+  pr25 <- append(pr25, r[[1]])
+  
+}
+top25p <- unique(pr25)
+
+
+```
+
+```{r}
+#create a df that contains the 250 keys , the films, and the producers
+vertax <- merge(key250, fkpr10, by.x = "fkpr10$keyindex", by.y = "keyindex", all.x = TRUE)
+
+#classify each producer as big(1) or small(0)
+
+big <- function(x)
+{
+  ifelse((x %in% top25p),1,0)
+}
+
+vertax$pctype <- big(vertax$pcindex)
+
+#for each keyword each film, get a score of wheather the film is made by big or small companies.
+fscore <- aggregate(pctype ~ pindex + `fkpr10$keyindex`, vertax, mean)
+
+#film that is collaborated by the two types of producer will have a score between 0~1. So classify 1 as Big (B), 0 as Small(S), and decimals as Collaboration (C).
+
+classify<- function(x)
+{
+  if(x == 1)
+  {
+    return("B")
+  }
+  if(x == 0)
+  {
+    return("S")
+  }
+  else
+  {
+    return("C")
+  }
+    
+}
+
+```
+
+```{r}
+fscore <- as.matrix(fscore[])
+a <- fscore[,3]
+filmclass <- list(classify(a[[1]]))
+
+for (i in 2: length(a))
+{
+  filmclass <- append(filmclass, classify(a[[i]])) 
+}
+
+fc <- cbind(fscore, filmclass)
+
+```
+
+```{r}
+
+fc <- as.data.frame(fc)
+kwclass <- list()
+for(i in unlist(unique(fc$`fkpr10$keyindex`)))
+{
+  a <- subset(fc, fc$`fkpr10$keyindex` == i)
+  b <- names(which.max(table(unlist(a[[4]]))))
+  kwclass <- append(kwclass, b)
+  
+}
+
+kwclassify <- cbind(unique(fc$`fkpr10$keyindex`), kwclass)
+```
+
+```{r}
+#find unique combination between key and film
+keyfilm <- unique(vertax[,c(1,3)])
+
+g <- graph_from_data_frame(keyfilm, directed = FALSE)
+gmat <- as.matrix(g[])[-c(1:length(unique(keyfilm$`fkpr10$keyindex`))),]
+gmat <- gmat[,c(1:length(unique(keyfilm$`fkpr10$keyindex`)))]
+tgmat <- t(gmat)
+
+membermat <- tgmat %*%gmat
+
+```
+
+
+```{r}
+g2 <- graph_from_adjacency_matrix(membermat)
+
+
+colors = V(g2)$class
+colors[colors == "B"] = "light blue"
+colors[colors == "S"] = "red"
+colors[colors == "C"] = "yellow"
+
+V(g2)$color = colors
+plot.igraph(g2,layout=layout.fruchterman.reingold, vertex.size = diag(membermat))
+```
+
+4.Extra challenge problem: Producers can choose to make films that are more specialized, or produce a portfolio that covers a wider range of topics and features. Use the keywords to generatea yearly measure of feature coverage for each producer for the years the producer has produced at least one film. Take this measure as the average Jaccard distance between each pair of keywords in the set of keywords a producer uses in its films that year. Do producers that make more specialized films, in terms of film topics, experience higher box office revenues per film? What does this suggest about audience tastes for films? Note that this calculation is intensive, and does not have to be performed directly on the matrices. Here, some looping sequencing that recycles the ojbects and refreshes the memory may be helpful. The t(combn) family can also be useful.
+
+```{r}
+
+```
+
